@@ -216,7 +216,7 @@ function StateManager() {
 				let musicAndWeather = getMusicAndWeather(rotateAlternatingGame && options.alternatingMusic, rotateAlternatingWeather && options.alternatingWeather);
 				notifyListeners("gameChange", [timeKeeper.getHour(), musicAndWeather.weather, musicAndWeather.music]);
 			}
-			if ((isKK() && !wasKK) || (kkVersion != options.kkVersion && isKK()) || ('kkSelectedSongsEnable' in changes || 'kkSelectedSongs' in changes)) notifyListeners("kkStart", [options.kkVersion]);
+			if (isKK() && (!wasKK || kkVersion != options.kkVersion || 'kkSelectedSongsEnable' in changes || 'kkSelectedSongs' in changes)) notifyListeners("kkStart", [options.kkVersion]);
 			if (!isKK() && wasKK) {
 				let musicAndWeather = getMusicAndWeather();
 				notifyListeners("hourMusic", [timeKeeper.getHour(), musicAndWeather.weather, musicAndWeather.music, false]);
