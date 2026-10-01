@@ -16,6 +16,8 @@ function StateManager() {
 	let badgeManager;
 	let weatherManager;
 	let isKKTime;
+	let currentRandomGame;
+	let currentRandomWeather;
 	let startup = true;
 	let browserClosed = false;
 
@@ -105,7 +107,9 @@ function StateManager() {
 			enableBackground: false,
 			tabAudioReduceValue: 80,
 			kkSelectedSongsEnable: false,
-			kkSelectedSongs: []
+			kkSelectedSongs: [],
+			alternatingMusic: false,
+			alternatingWeather: false
 		}, items => {
 			options = items;
 			if (typeof callback === 'function') callback();
@@ -114,7 +118,7 @@ function StateManager() {
 
 	// Gets the current game based on the option, and weather if
 	// we're using a live weather option.
-	function getMusicAndWeather() {
+	function getMusicAndWeather(rotateAlternatingGame = false, rotateAlternatingWeather = false) {
 		let data = {
 			music: options.music,
 			weather: options.weather
@@ -128,7 +132,13 @@ function StateManager() {
 				'new-horizons'
 			];
 
-			data.music = games[Math.floor(Math.random() * games.length)];
+			if (options.alternatingMusic) {
+				if (rotateAlternatingGame || !currentRandomGame) {
+					let availableGames = games.filter(game => game !== currentRandomGame);
+					currentRandomGame = availableGames[Math.floor(Math.random() * availableGames.length)];
+				}
+				data.music = currentRandomGame;
+			} else data.music = games[Math.floor(Math.random() * games.length)];
 		}
 
 		if (isLive()) {
@@ -143,12 +153,19 @@ function StateManager() {
 				'snowing'
 			];
 
-			data.weather = weathers[Math.floor(Math.random() * weathers.length)];
+			if (options.alternatingWeather) {
+				if (rotateAlternatingWeather || !currentRandomWeather) {
+					let availableWeathers = weathers.filter(weather => weather !== currentRandomWeather && !(data.music === 'animal-crossing' && weather === 'raining'));
+					currentRandomWeather = availableWeathers[Math.floor(Math.random() * availableWeathers.length)];
+				}
+				data.weather = currentRandomWeather;
+			} else data.weather = weathers[Math.floor(Math.random() * weathers.length)];
 		}
 
 		// If the weather is meant to be raining, and the chosen game is animal crossing, then we
 		// override the weather to be snowing since there is no raining music for animal crossing.
 		if (data.weather == 'raining' && data.music == 'animal-crossing') data.weather = 'snowing';
+		if (options.alternatingWeather && options.weather === 'weather-random') currentRandomWeather = data.weather;
 
 		return data;
 	}
@@ -160,10 +177,20 @@ function StateManager() {
 		isKKTime = day == 6 && hour >= 20;
 		if (isKK() && !wasKK) notifyListeners("kkStart", [options.kkVersion]);
 		else if (!isKK()) {
-			let musicAndWeather = getMusicAndWeather();
+			let musicAndWeather = getMusicAndWeather(options.alternatingMusic, options.alternatingWeather);
 			notifyListeners("hourMusic", [hour, musicAndWeather.weather, musicAndWeather.music, true]);
 			// Play hourly tune when paused, but only if town tune is enabled
 			if (options.paused && (options.absoluteTownTune && options.enableTownTune)) townTuneManager.playTune(tabAudio.audible);
+		}
+	});
+
+	timeKeeper.registerQuarterHourlyCallback(() => {
+		let rotateGame = options.alternatingMusic && options.music === 'game-random';
+		let rotateWeather = options.alternatingWeather && options.weather === 'weather-random';
+		if ((rotateGame || rotateWeather) && !isKK()) {
+			let musicAndWeather = getMusicAndWeather(rotateGame, rotateWeather);
+			let event = rotateGame ? "gameChange" : "weatherChange";
+			notifyListeners(event, [timeKeeper.getHour(), musicAndWeather.weather, musicAndWeather.music]);
 		}
 	});
 
@@ -183,8 +210,10 @@ function StateManager() {
 			if ('zipCode' in changes) weatherManager.setZip(changes.zipCode.newValue);
 			if ('countryCode' in changes) weatherManager.setCountry(changes.countryCode.newValue);
 			if ('volume' in changes) notifyListeners("volume", [changes.volume.newValue]);
-			if (('music' in changes || 'weather' in changes) && !isKK()) {
-				let musicAndWeather = getMusicAndWeather();
+			if (('music' in changes || 'weather' in changes || 'alternatingMusic' in changes || 'alternatingWeather' in changes) && !isKK()) {
+				let rotateAlternatingGame = 'music' in changes || 'alternatingMusic' in changes;
+				let rotateAlternatingWeather = 'weather' in changes || 'alternatingWeather' in changes;
+				let musicAndWeather = getMusicAndWeather(rotateAlternatingGame && options.alternatingMusic, rotateAlternatingWeather && options.alternatingWeather);
 				notifyListeners("gameChange", [timeKeeper.getHour(), musicAndWeather.weather, musicAndWeather.music]);
 			}
 			if ((isKK() && !wasKK) || (kkVersion != options.kkVersion && isKK()) || ('kkSelectedSongsEnable' in changes || 'kkSelectedSongs' in changes)) notifyListeners("kkStart", [options.kkVersion]);

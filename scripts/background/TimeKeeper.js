@@ -7,15 +7,18 @@ function TimeKeeper() {
 	var self = this;
 	
 	var hourlyCallback;
+	var quarterHourlyCallback;
 	
 	// DECLARING TIME VARIABLES
 	var date, currHour, currDay, currMonth, currDate;
+	var currentQuarter;
 	// running updateTimeVariables created issues, because JavaScript, so initially updating these manually.
 	date = new Date();
 	currHour = date.getHours();
 	currDay = date.getDay();
 	currMonth = date.getMonth();
 	currDate = date.getDate();
+	currentQuarter = getQuarterKey(date);
 	// INITIALIZING VARIABLES
 	this.updateTimeVariables = function(){
 		date = new Date();
@@ -28,6 +31,10 @@ function TimeKeeper() {
 
 	this.registerHourlyCallback = function(callback) {
 		hourlyCallback = callback;
+	};
+
+	this.registerQuarterHourlyCallback = function(callback) {
+		quarterHourlyCallback = callback;
 	};
 
 	this.getHour = function() {
@@ -81,6 +88,13 @@ function TimeKeeper() {
 	function timeCheck() {
 		var newDate = new Date();
 		currDay = newDate.getDay();
+		var newQuarter = getQuarterKey(newDate);
+		if (newQuarter !== currentQuarter) {
+			currentQuarter = newQuarter;
+			if (newDate.getHours() === currHour && Math.floor(newDate.getMinutes() / 15) > 0 && quarterHourlyCallback) {
+				quarterHourlyCallback(currDay, newDate.getHours(), Math.floor(newDate.getMinutes() / 15));
+			}
+		}
 		// if we're in a new hour
 		if (newDate.getHours() != currHour) {
 			currHour = newDate.getHours();
@@ -88,6 +102,10 @@ function TimeKeeper() {
 				hourlyCallback(currDay, currHour);
 			}
 		}
+	}
+
+	function getQuarterKey(date) {
+		return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}-${date.getHours()}-${Math.floor(date.getMinutes() / 15)}`;
 	}
 
 	setInterval(timeCheck, 1000);

@@ -6,11 +6,13 @@ const onClickElements = [
 	'new-leaf',
 	'new-horizons',
 	'game-random',
+	'alternating-music',
 	'sunny',
 	'snowing',
 	'raining',
 	'live',
 	'weather-random',
+	'alternating-weather',
 	'no-kk',
 	'enable-kk',
 	'always-kk',
@@ -167,11 +169,15 @@ function saveOptions() {
 	document.getElementById('kk-version-selection').querySelectorAll('input').forEach(updateChildrenState.bind(null, enabledKKVersion));
 
 	document.getElementById('kk-songs-selection').disabled = !kkSelectedSongsEnable;
+	document.getElementById('alternating-music').disabled = music !== 'game-random' || alwaysKK;
+	document.getElementById('alternating-weather').disabled = weather !== 'weather-random' || alwaysKK;
 
 	chrome.storage.sync.set({
 		volume,
 		music,
+		alternatingMusic: document.getElementById('alternating-music').checked,
 		weather,
+		alternatingWeather: document.getElementById('alternating-weather').checked,
 		enableNotifications,
 		enableKK,
 		alwaysKK,
@@ -194,7 +200,9 @@ function restoreOptions() {
 	chrome.storage.sync.get({
 		volume: 0.5,
 		music: 'new-horizons',
+		alternatingMusic: false,
 		weather: 'sunny',
+		alternatingWeather: false,
 		enableNotifications: true,
 		enableKK: true,
 		alwaysKK: false,
@@ -214,7 +222,9 @@ function restoreOptions() {
 		document.getElementById('volume').value = items.volume;
 		document.getElementById('volumeText').innerHTML = `${formatPercentage(items.volume*100)}`;
 		document.getElementById(items.music).checked = true;
+		document.getElementById('alternating-music').checked = items.alternatingMusic;
 		document.getElementById(items.weather).checked = true;
+		document.getElementById('alternating-weather').checked = items.alternatingWeather;
 		document.getElementById('enable-notifications').checked = items.enableNotifications;
 		document.getElementById('no-kk').checked = true;
 		document.getElementById('enable-kk').checked = items.enableKK;
@@ -234,6 +244,8 @@ function restoreOptions() {
 
 		// Disable raining if the game is animal crossing, since there is no raining music for animal crossing.
 		document.getElementById('raining').disabled = items.music == 'animal-crossing';
+		document.getElementById('alternating-music').disabled = items.music !== 'game-random' || items.alwaysKK;
+		document.getElementById('alternating-weather').disabled = items.weather !== 'weather-random' || items.alwaysKK;
 		document.getElementById('absolute-town-tune').disabled = !items.enableTownTune;
 
 		let enabledKKVersion = !(items.alwaysKK || items.enableKK);
