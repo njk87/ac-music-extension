@@ -33,11 +33,11 @@ function AudioManager(addEventListener, isTownTune) {
 
 	// isHourChange is true if it's an actual hour change,
 	// false if we're activating music in the middle of an hour
-	function playHourlyMusic(hour, weather, game, isHourChange) {
+	function playHourlyMusic(hour, weather, game, isHourChange, transitionFadeDuration) {
 		clearLoop();
 		audio.loop = true;
 		audio.removeEventListener("ended", playKKSong);
-		let fadeOutLength = isHourChange ? 3000 : 500;
+		let fadeOutLength = transitionFadeDuration || (isHourChange ? 3000 : 500);
 		fadeOutAudio(fadeOutLength, () => {
 			if (isHourChange && isTownTune() && !tabAudioPaused) {
 				townTunePlaying = true;
@@ -46,7 +46,7 @@ function AudioManager(addEventListener, isTownTune) {
 					if (!pausedDuringTownTune) playHourSong(game, weather, hour, false);
 					else pausedDuringTownTune = false;
 				});
-			} else playHourSong(game, weather, hour, false);
+			} else playHourSong(game, weather, hour, false, transitionFadeDuration);
 		});
 
 		checkMediaSessionSupport(() => {
@@ -56,7 +56,7 @@ function AudioManager(addEventListener, isTownTune) {
 
 	// Plays a song for an hour, setting up loop times if
 	// any exist
-	function playHourSong(game, weather, hour, skipIntro) {
+	function playHourSong(game, weather, hour, skipIntro, fadeInDuration) {
 		audio.loop = true;
 
 		// STANDARD SONG NAME FORMATTING
@@ -89,6 +89,9 @@ function AudioManager(addEventListener, isTownTune) {
 		audio.onpause = onPause;
 
 		setVolume();
+		let targetVolume = audio.volume;
+		let shouldFadeIn = fadeInDuration && !tabAudioPaused;
+		if (shouldFadeIn) audio.volume = 0;
 
 		audio.onplay = () => {
 			// If we resume mid-song, then we recalculate the delayToLoop
@@ -100,7 +103,13 @@ function AudioManager(addEventListener, isTownTune) {
 			}
 		};
 
-		if (!tabAudioPaused) audio.play().then(setLoopTimes).catch(audioPlayError);
+		if (!tabAudioPaused) audio.play().then(() => {
+			if (shouldFadeIn) fadeInAudio(fadeInDuration, targetVolume);
+			setLoopTimes();
+		}).catch(() => {
+			audio.volume = targetVolume;
+			audioPlayError();
+		});
 		else window.notify("pause", [tabAudioPaused]); // Set the badge icon back to the paused state
 
 		function setLoopTimes() {
@@ -140,6 +149,25 @@ function AudioManager(addEventListener, isTownTune) {
 		}
 
 		mediaSessionManager.updateMetadata(game, hour, weather);
+	}
+
+	function fadeInAudio(time, targetVolume) {
+		let startTime = Date.now();
+		let fadeInterval = setInterval(() => {
+			let progress = Math.min((Date.now() - startTime) / time, 1);
+			audio.volume = targetVolume * progress;
+			if (progress >= 1) {
+				clearInterval(fadeInterval);
+				if (killFadeInterval === cancelFade) killFadeInterval = null;
+			}
+		}, 50);
+
+		function cancelFade() {
+			clearInterval(fadeInterval);
+			killFadeInterval = null;
+		}
+
+		killFadeInterval = cancelFade;
 	}
 
 	function playKKMusic(_kkVersion) {

@@ -190,7 +190,7 @@ function StateManager() {
 		if ((rotateGame || rotateWeather) && !isKK()) {
 			let musicAndWeather = getMusicAndWeather(rotateGame, rotateWeather);
 			let event = rotateGame ? "gameChange" : "weatherChange";
-			notifyListeners(event, [timeKeeper.getHour(), musicAndWeather.weather, musicAndWeather.music]);
+			notifyListeners(event, [timeKeeper.getHour(), musicAndWeather.weather, musicAndWeather.music, false, 1500]);
 		}
 	});
 
