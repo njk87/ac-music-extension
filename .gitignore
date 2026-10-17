@@ -50,3 +50,7 @@ img/cover/kk
 
 # IDEA
 .idea
+
+# Development dependencies and isolated browser test profiles
+node_modules/
+work/

@@ -26,7 +26,7 @@
     var pitchToFreq = function(pitch) {
       if (typeof pitch == 'number') return pitch;
       
-      index = availablePitches.indexOf(pitch);
+      var index = availablePitches.indexOf(pitch);
       if (index == -1) return null; // Pitch does not exist in register
       
       var freq = frequencies[index];
@@ -58,7 +58,7 @@
       filter.frequency.value = Math.sqrt(freq) * cutoffModifier;
       filter.Q.value = Q;
 
-      gain = audioContext.createGain();
+      var gain = audioContext.createGain();
       gain.gain.value = 0;
 
       oscillator.connect(filter);
@@ -90,11 +90,12 @@
 var createSampler = function(audioContext) {
   var instrumentName = 'sampler';
   var bellBuffer;
+  var sources = new Set();
   var startPoints = [null, null];
   var chimeLength = 3.8;
 
   var pitchToStartPoint = function(pitch) {
-    index = availablePitches.indexOf(pitch);
+    var index = availablePitches.indexOf(pitch);
     if (index == -1) return null;
 
     var startPoint = startPoints[index]
@@ -103,18 +104,10 @@ var createSampler = function(audioContext) {
     return startPoint;
   };
 
-  var loadBells = function() {
-    var reqListener = function() {
-      audioContext.decodeAudioData(req.response, function(buffer) {
-        bellBuffer = buffer;
-      });
-    };
-
-    var req = new XMLHttpRequest();
-    req.responseType = 'arraybuffer';
-    req.onload = reqListener;
-    req.open("get", chrome.extension.getURL('../sound/bells.ogg'), true);
-    req.send();
+  var loadBells = async function() {
+    var response = await fetch(chrome.runtime.getURL('sound/bells.ogg'));
+    if (!response.ok) throw new Error('Town tune bell sample could not be loaded');
+    bellBuffer = await audioContext.decodeAudioData(await response.arrayBuffer());
   };
 
   var initStartPoints = function() {
@@ -127,6 +120,8 @@ var createSampler = function(audioContext) {
     if (!bellBuffer) return;
     var source = audioContext.createBufferSource();
     source.buffer = bellBuffer;
+    sources.add(source);
+    source.onended = function() { sources.delete(source); };
     
     // If pitch is '?', randomizing pitch
     if(pitch == '?') pitch = availablePitches[ 2 + Math.floor( Math.random() * (availablePitches.length - 3) ) ]
@@ -135,7 +130,7 @@ var createSampler = function(audioContext) {
     // The notes sound broken & not accurate to the editor's volume when played at higher volumes, vol is therefore reduced with this multiplier.
       
     // Configuring gain
-    gain = audioContext.createGain();
+    var gain = audioContext.createGain();
     gain.gain.value = volume;
     
     // Playing audio
@@ -145,10 +140,15 @@ var createSampler = function(audioContext) {
   };
 
   initStartPoints();
-  loadBells();
+  var ready = loadBells();
 
   return {
-    playNote: playNote
+    playNote: playNote,
+    ready: ready,
+    stop: function() {
+      sources.forEach(function(source) { try { source.stop(); } catch (_) {} });
+      sources.clear();
+    }
   }
 };
 
@@ -227,7 +227,7 @@ var createTunePlayer = function(audioContext, bpm) {
     return callbacks;
   };
 
-  return tunePlayer = {
+  return {
     availablePitches: availablePitches,
     playTune: playTune
   };

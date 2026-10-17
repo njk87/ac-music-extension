@@ -89,7 +89,9 @@ window.onload = function () {
 						});
 					}
 				});
-			} else if (hasPerms) chrome.permissions.remove({ permissions: ['background'] });
+			} else {
+                chrome.permissions.remove({ permissions: ['background'] }, saveOptions);
+            }
 		});
 	}
 

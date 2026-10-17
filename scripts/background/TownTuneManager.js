@@ -1,31 +1,37 @@
-// Handles playing town tunes, could potentially be either folded
-// into AudioManager, or tune_player instead of making createSampler
-// and createTunePlayer globally accessable.
-
+// Chrome MV3 port: no storage APIs are called in the offscreen player.
 'use strict';
-
 function TownTuneManager() {
-
-	// var defaultTune = ["C2", "E2", "C2", "G1", "F1", "G1", "B1", "D2", "C2", "zZz", "G1", "zZz", "C2", "-", "-", "zZz"];
-	var defaultTune = ["C3", "E3", "C3", "G2", "F2", "G2", "B2", "D3", "C3", "zZz", "?", "zZz", "C3", "-", "-", "zZz"];
-	var defaultTownTuneVolume = 0.75;
-	var defaultTabAudio = 'pause';
-	var defaultTabAudioReduceVolume = 80;
-	var audioContext = new AudioContext();
-	var sampler = createSampler(audioContext);
-	var tunePlayer = createTunePlayer(audioContext);
-	
-	// Play tune and call doneCB after it's done
-	this.playTune = function(tabAudioPlaying = false, doneCB) {
-		chrome.storage.sync.get({ townTune: defaultTune, townTuneVolume: defaultTownTuneVolume, tabAudio: defaultTabAudio, tabAudioReduceValue: defaultTabAudioReduceVolume }, function(items){
-			// Reduce the volume when necessary
-			var volume = items.townTuneVolume;
-			if (items.tabAudio == 'reduce' && tabAudioPlaying) volume = volume * (1 - items.tabAudioReduceValue / 100);
-			if (volume < 0) volume = 0;
-			if (volume > 1) volume = 1;
-
-			tunePlayer.playTune(items.townTune, sampler, 66, volume).done(doneCB);	//Original "BPM" was 100.
-		});
-	}
-
+    let context;
+    let sampler;
+    let tunePlayer;
+    let timer;
+    let finish;
+    let generation = 0;
+    this.stop = function() {
+        generation++;
+        clearTimeout(timer);
+        if (sampler) sampler.stop();
+        if (finish) {finish(); finish = null;}
+    };
+    this.playTune = async function(options, audible) {
+        this.stop();
+        const token = generation;
+        if (!context) {
+            context = new AudioContext();
+            sampler = createSampler(context);
+            tunePlayer = createTunePlayer(context);
+        }
+        await sampler.ready;
+        if (token !== generation) return;
+        await context.resume();
+        if (token !== generation) return;
+        const volume = Math.max(0, Math.min(1, options.townTuneVolume *
+            (audible && options.tabAudio === 'reduce' ? 1 - options.tabAudioReduceValue / 100 : 1)));
+        const tune = options.townTune;
+        tunePlayer.playTune(tune, sampler, 66, volume);
+        await new Promise(resolve => {
+            finish = resolve;
+            timer = setTimeout(() => {finish = null; resolve();}, (60 / 66 * tune.length + 4) * 1000);
+        });
+    };
 }

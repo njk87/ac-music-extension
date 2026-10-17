@@ -1,0 +1,13 @@
+{
+  "name": "ac-music-chrome-mv3",
+  "version": "4.3.0",
+  "private": true,
+  "description": "Manifest V3 compatibility port of Animal Crossing Music",
+  "scripts": {
+    "test": "node --test tests/playback.test.cjs tests/worker.test.cjs",
+    "test:browser": "node tests/browser.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}
